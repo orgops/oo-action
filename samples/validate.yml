@@ -1,0 +1,16 @@
+name: OrgOps Validate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: orgops/oo-action@v1
+        with:
+          command: validate
+          path: .
