@@ -27,17 +27,14 @@ jobs:
           metadata = yaml.safe_load(Path("action.yml").read_text())
           assert metadata["name"] == "OrgOps oo CLI"
           assert metadata["runs"]["using"] == "composite"
-          assert set(["command", "path", "oo-version", "skip-install"]).issubset(metadata["inputs"])
+          assert "result-path" in metadata["outputs"]
+          assert "report-path" not in metadata["outputs"]
           PY
 
-  smoke:
+  runner:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - name: Test runner command assembly
         run: |
@@ -47,15 +44,24 @@ jobs:
           echo "$@" > "$RUNNER_TEMP/oo-args.txt"
           SH
           chmod +x "$RUNNER_TEMP/bin/oo"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           PATH="$RUNNER_TEMP/bin:$PATH" \
             OO_ACTION_COMMAND=topology \
             OO_ACTION_PATH=. \
             OO_ACTION_ARGS="--branch main" \
             python scripts/run-oo.py
-          test "$(cat "$RUNNER_TEMP/oo-args.txt")" = "topology . --branch main"
+          test "$(cat "$RUNNER_TEMP/oo-args.txt")" = \
+            "topology . --branch main --format json --output $RUNNER_TEMP/orgops-topology-result.json"
+
+      - name: Reject unsupported prototype command
+        run: |
+          if OO_ACTION_COMMAND=team python scripts/run-oo.py; then
+            exit 1
+          fi
 
   self-test:
+    strategy:
+      matrix:
+        command: [validate, topology, ownership, assess]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,21 +72,30 @@ jobs:
           cat > "$RUNNER_TEMP/bin/oo" <<'SH'
           #!/usr/bin/env bash
           command="$1"
-          target="${2:-.}"
-          if [ "$command" = "topology" ]; then
-            echo "# Fake topology report" > "$target/ORGOPS_TOPOLOGY_REPORT.md"
-          fi
-          echo "fake oo: $*"
+          shift
+          output=""
+          while [ "$#" -gt 0 ]; do
+            if [ "$1" = "--output" ]; then
+              output="$2"
+              break
+            fi
+            shift
+          done
+          printf '{"schema_version":"v1","command":"%s","result":{}}\n' "$command" > "$output"
           SH
           chmod +x "$RUNNER_TEMP/bin/oo"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
-      - name: Run action against sample repository
+      - id: orgops
         uses: ./
         with:
-          command: topology
+          command: ${{ matrix.command }}
           path: .
           skip-install: "true"
 
-      - name: Check generated report
-        run: test -f ORGOPS_TOPOLOGY_REPORT.md
+      - name: Check JSON result
+        env:
+          RESULT_PATH: ${{ steps.orgops.outputs.result-path }}
+        run: |
+          test -f "$RESULT_PATH"
+          python -c 'import json, os; data=json.load(open(os.environ["RESULT_PATH"])); assert data["schema_version"] == "v1"'
