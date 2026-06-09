@@ -7,16 +7,9 @@ import os
 import shlex
 import subprocess
 import sys
-from pathlib import Path
 
 
-REPORT_FILES = {
-    "topology": "ORGOPS_TOPOLOGY_REPORT.md",
-    "team": "ORGOPS_TEAM_REPORT.md",
-    "maturity": "ORGOPS_MATURITY_REPORT.md",
-}
-
-SUPPORTED_COMMANDS = frozenset({"topology", "team", "maturity", "validate"})
+SUPPORTED_COMMANDS = frozenset({"assess", "ownership", "topology", "validate"})
 
 
 def write_output(name: str, value: str) -> None:
@@ -25,16 +18,6 @@ def write_output(name: str, value: str) -> None:
         return
     with open(output_file, "a", encoding="utf-8") as handle:
         handle.write(f"{name}={value}\n")
-
-
-def expected_report_path(command: str, target_path: str) -> str:
-    report_name = REPORT_FILES.get(command)
-    if not report_name:
-        return ""
-
-    path = Path(target_path)
-    report_dir = path if path.is_dir() else path.parent
-    return str(report_dir / report_name)
 
 
 def main() -> int:
@@ -50,14 +33,14 @@ def main() -> int:
         )
         return 2
 
+    result_dir = os.environ.get("RUNNER_TEMP", "").strip() or os.getcwd()
+    result_path = os.path.join(result_dir, f"orgops-{command_name}-result.json")
     command = ["oo", command_name, target_path]
     if extra_args:
         command.extend(shlex.split(extra_args))
+    command.extend(["--format", "json", "--output", result_path])
 
-    report_path = expected_report_path(command_name, target_path)
-    if report_path:
-        write_output("report-path", report_path)
-
+    write_output("result-path", result_path)
     print(f"Running: {shlex.join(command)}")
     return subprocess.call(command)
 

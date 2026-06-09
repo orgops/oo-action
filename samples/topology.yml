@@ -16,5 +16,5 @@ jobs:
           command: topology
           path: .
 
-      - name: Show report path
-        run: 'echo "Report: ${{ steps.orgops.outputs.report-path }}"'
+      - name: Show result path
+        run: 'echo "Result: ${{ steps.orgops.outputs.result-path }}"'
