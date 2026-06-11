@@ -7,15 +7,16 @@ branding:
   color: "blue"
 
 inputs:
-  command:
-    description: "oo command to run: validate, topology, ownership, or assess."
-    required: true
   path:
-    description: "Repository path or file path passed to the oo command."
+    description: "Repository path or regular file passed to oo validate."
     required: false
     default: "."
+  contract:
+    description: "Optional explicit local operating contract path."
+    required: false
+    default: ""
   args:
-    description: "Additional arguments passed after command and path."
+    description: "Additional arguments passed to oo validate."
     required: false
     default: ""
   oo-version:
@@ -48,9 +49,21 @@ inputs:
     default: "false"
 
 outputs:
+  status:
+    description: "Validation status: pass, fail, invalid_input, or execution_error."
+    value: ${{ steps.run-oo.outputs.status }}
   result-path:
     description: "Path to the versioned JSON result produced by oo."
     value: ${{ steps.run-oo.outputs.result-path }}
+  contract-digest:
+    description: "SHA-256 digest of the normalized operating contract."
+    value: ${{ steps.run-oo.outputs.contract-digest }}
+  failed-count:
+    description: "Number of failed decisions."
+    value: ${{ steps.run-oo.outputs.failed-count }}
+  unknown-count:
+    description: "Number of unknown decisions."
+    value: ${{ steps.run-oo.outputs.unknown-count }}
 
 runs:
   using: "composite"
@@ -75,7 +88,7 @@ runs:
       id: run-oo
       shell: bash
       env:
-        OO_ACTION_COMMAND: ${{ inputs.command }}
         OO_ACTION_PATH: ${{ inputs.path }}
+        OO_ACTION_CONTRACT: ${{ inputs.contract }}
         OO_ACTION_ARGS: ${{ inputs.args }}
       run: python "$GITHUB_ACTION_PATH/scripts/run-oo.py"

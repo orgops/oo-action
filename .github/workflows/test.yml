@@ -3,12 +3,11 @@ name: Test
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  metadata:
+  action:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,77 +24,47 @@ jobs:
           import yaml
 
           metadata = yaml.safe_load(Path("action.yml").read_text())
-          assert metadata["name"] == "OrgOps oo CLI"
-          assert metadata["runs"]["using"] == "composite"
-          assert "result-path" in metadata["outputs"]
-          assert "report-path" not in metadata["outputs"]
+          assert "command" not in metadata["inputs"]
+          assert set(metadata["outputs"]) == {
+              "status", "result-path", "contract-digest", "failed-count", "unknown-count"
+          }
           PY
 
-  runner:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Test runner command assembly
+      - name: Provide failing fake oo command
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           cat > "$RUNNER_TEMP/bin/oo" <<'SH'
           #!/usr/bin/env bash
-          echo "$@" > "$RUNNER_TEMP/oo-args.txt"
-          SH
-          chmod +x "$RUNNER_TEMP/bin/oo"
-          PATH="$RUNNER_TEMP/bin:$PATH" \
-            OO_ACTION_COMMAND=topology \
-            OO_ACTION_PATH=. \
-            OO_ACTION_ARGS="--branch main" \
-            python scripts/run-oo.py
-          test "$(cat "$RUNNER_TEMP/oo-args.txt")" = \
-            "topology . --branch main --format json --output $RUNNER_TEMP/orgops-topology-result.json"
-
-      - name: Reject unsupported prototype command
-        run: |
-          if OO_ACTION_COMMAND=team python scripts/run-oo.py; then
-            exit 1
-          fi
-
-  self-test:
-    strategy:
-      matrix:
-        command: [validate, topology, ownership, assess]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Provide fake oo command
-        run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          cat > "$RUNNER_TEMP/bin/oo" <<'SH'
-          #!/usr/bin/env bash
-          command="$1"
-          shift
           output=""
           while [ "$#" -gt 0 ]; do
-            if [ "$1" = "--output" ]; then
-              output="$2"
-              break
-            fi
+            if [ "$1" = "--output" ]; then output="$2"; break; fi
             shift
           done
-          printf '{"schema_version":"v1","command":"%s","result":{}}\n' "$command" > "$output"
+          printf '{"schema_version":"v1","command":"validate","result":{"status":"fail","exit_code":1,"contract":{"digest":"abc"},"summary":{"failed":2,"unknown":1}}}\n' > "$output"
+          exit 1
           SH
           chmod +x "$RUNNER_TEMP/bin/oo"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
-      - id: orgops
+      - name: Run action and preserve outputs on failure
+        id: orgops
+        continue-on-error: true
         uses: ./
         with:
-          command: ${{ matrix.command }}
           path: .
+          contract: .orgops/contract.yaml
           skip-install: "true"
 
-      - name: Check JSON result
+      - name: Check structured outputs
         env:
           RESULT_PATH: ${{ steps.orgops.outputs.result-path }}
+          STATUS: ${{ steps.orgops.outputs.status }}
+          DIGEST: ${{ steps.orgops.outputs.contract-digest }}
+          FAILED: ${{ steps.orgops.outputs.failed-count }}
+          UNKNOWN: ${{ steps.orgops.outputs.unknown-count }}
         run: |
           test -f "$RESULT_PATH"
-          python -c 'import json, os; data=json.load(open(os.environ["RESULT_PATH"])); assert data["schema_version"] == "v1"'
+          test "$STATUS" = "fail"
+          test "$DIGEST" = "abc"
+          test "$FAILED" = "2"
+          test "$UNKNOWN" = "1"
