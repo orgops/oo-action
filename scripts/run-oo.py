@@ -32,6 +32,10 @@ def main() -> int:
     command.extend(["--format", "json", "--output", result_path])
 
     write_output("result-path", result_path)
+    write_output("status", "execution_error")
+    write_output("contract-digest", "")
+    write_output("failed-count", "0")
+    write_output("unknown-count", "0")
     print(f"Running: {shlex.join(command)}")
     completed = subprocess.run(command, check=False)
     if os.path.isfile(result_path):

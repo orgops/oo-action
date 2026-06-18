@@ -20,9 +20,9 @@ inputs:
     required: false
     default: ""
   oo-version:
-    description: "Version of the Python package to install. Use 'latest' for the newest release."
+    description: "Pinned orgops package version to install."
     required: false
-    default: "latest"
+    default: "0.1.0"
   package-name:
     description: "Python package name that provides the oo console script."
     required: false
