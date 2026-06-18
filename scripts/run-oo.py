@@ -24,6 +24,8 @@ def main() -> int:
     extra_args = os.environ.get("OO_ACTION_ARGS", "").strip()
     result_dir = os.environ.get("RUNNER_TEMP", "").strip() or os.getcwd()
     result_path = os.path.join(result_dir, "orgops-validate-result.json")
+    if os.path.exists(result_path):
+        os.unlink(result_path)
     command = ["oo", "validate", target_path]
     if contract_path:
         command.extend(["--contract", contract_path])
