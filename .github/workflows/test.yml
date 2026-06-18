@@ -25,10 +25,21 @@ jobs:
 
           metadata = yaml.safe_load(Path("action.yml").read_text())
           assert "command" not in metadata["inputs"]
+          assert metadata["inputs"]["oo-version"]["default"] == "0.1.0"
+          assert "latest" not in metadata["inputs"]["oo-version"]["description"]
           assert set(metadata["outputs"]) == {
               "status", "result-path", "contract-digest", "failed-count", "unknown-count"
           }
           PY
+
+      - name: Reject unpinned latest install
+        env:
+          OO_ACTION_OO_VERSION: latest
+        run: |
+          if python scripts/install-oo.py; then
+            echo "install-oo.py accepted an unpinned latest version"
+            exit 1
+          fi
 
       - name: Provide failing fake oo command
         run: |
@@ -68,3 +79,32 @@ jobs:
           test "$DIGEST" = "abc"
           test "$FAILED" = "2"
           test "$UNKNOWN" = "1"
+
+      - name: Provide missing-result fake oo command
+        run: |
+          cat > "$RUNNER_TEMP/bin/oo" <<'SH'
+          #!/usr/bin/env bash
+          exit 3
+          SH
+          chmod +x "$RUNNER_TEMP/bin/oo"
+
+      - name: Run action and expose execution error
+        id: orgops-exec-error
+        continue-on-error: true
+        uses: ./
+        with:
+          path: .
+          contract: .orgops/contract.yaml
+          skip-install: "true"
+
+      - name: Check execution error outputs
+        env:
+          RESULT_PATH: ${{ steps.orgops-exec-error.outputs.result-path }}
+          STATUS: ${{ steps.orgops-exec-error.outputs.status }}
+          FAILED: ${{ steps.orgops-exec-error.outputs.failed-count }}
+          UNKNOWN: ${{ steps.orgops-exec-error.outputs.unknown-count }}
+        run: |
+          test -n "$RESULT_PATH"
+          test "$STATUS" = "execution_error"
+          test "$FAILED" = "0"
+          test "$UNKNOWN" = "0"

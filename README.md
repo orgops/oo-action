@@ -24,7 +24,7 @@ local diagnostic workflow.
 | `path` | `.` | Repository or regular file to validate. |
 | `contract` | empty | Optional explicit local contract path. |
 | `args` | empty | Additional `oo validate` arguments. |
-| `oo-version` | `latest` | Released `orgops` package version. |
+| `oo-version` | `0.1.0` | Pinned released `orgops` package version. |
 | `package-name` | `orgops` | Package providing `oo`. |
 | `python-version` | `3.12` | Python runtime. |
 | `skip-install` | `false` | Use an existing `oo` executable. |

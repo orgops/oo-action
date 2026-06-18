@@ -1,17 +1,21 @@
-name: OrgOps Topology From TestPyPI
+name: OrgOps Validate From TestPyPI
 
 on:
   workflow_dispatch:
+    inputs:
+      oo-version:
+        description: TestPyPI orgops package version
+        required: true
 
 jobs:
-  topology:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: orgops/oo-action@v1
         with:
-          command: topology
           path: .
+          oo-version: ${{ inputs.oo-version }}
           package-index-url: "https://test.pypi.org/simple/"
           extra-index-url: "https://pypi.org/simple/"

@@ -24,6 +24,8 @@ def main() -> int:
     extra_args = os.environ.get("OO_ACTION_ARGS", "").strip()
     result_dir = os.environ.get("RUNNER_TEMP", "").strip() or os.getcwd()
     result_path = os.path.join(result_dir, "orgops-validate-result.json")
+    if os.path.exists(result_path):
+        os.unlink(result_path)
     command = ["oo", "validate", target_path]
     if contract_path:
         command.extend(["--contract", contract_path])
@@ -32,6 +34,10 @@ def main() -> int:
     command.extend(["--format", "json", "--output", result_path])
 
     write_output("result-path", result_path)
+    write_output("status", "execution_error")
+    write_output("contract-digest", "")
+    write_output("failed-count", "0")
+    write_output("unknown-count", "0")
     print(f"Running: {shlex.join(command)}")
     completed = subprocess.run(command, check=False)
     if os.path.isfile(result_path):
